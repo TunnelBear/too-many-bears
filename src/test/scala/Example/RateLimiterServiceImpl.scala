@@ -1,4 +1,4 @@
-package RateLimiter.Example
+package Example
 
 import RateLimiter.RateLimiterService
 

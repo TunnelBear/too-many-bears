@@ -1,4 +1,5 @@
-package RateLimiter.Example
+package Example
+
 import RateLimiter.RateLimiterStorage
 
 class RateLimitedController extends RateLimiterServiceImpl {
