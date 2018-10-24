@@ -3,15 +3,17 @@ package RateLimiter.RateLimiters
 import RateLimiter.RateLimiterStorage
 import RateLimiter.Strategies.TagStrategy
 
-case class TagLimiter(tag: String, ip: String, limit: Long, expiry: Long)(implicit rateLimiterStorage: RateLimiterStorage) extends BaseRateLimiter {
+import scala.concurrent.{ExecutionContext, Future}
+
+case class TagLimiter(tag: String, ip: String, limit: Long, expiry: Long)(implicit rateLimiterStorage: RateLimiterStorage, executionContext: ExecutionContext) extends BaseRateLimiter {
 
   private final val Identifier = "TagLimiter"
 
-  override def allow: Boolean = {
+  override def allow: Future[Boolean] = {
     TagStrategy(Identifier, tag, ip, limit, expiry).allow
   }
 
-  override def increment: Unit = {
+  override def increment: Future[Unit] = {
     TagStrategy(Identifier, tag, ip, limit, expiry).increment()
   }
 

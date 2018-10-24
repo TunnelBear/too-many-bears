@@ -3,14 +3,16 @@ package RateLimiter.RateLimiters
 import RateLimiter.RateLimiterStorage
 import RateLimiter.Strategies.IPStrategy
 
-case class IPLimiter(ip: String, limit: Long, expiry: Long)(implicit rateLimiterStorage: RateLimiterStorage) extends BaseRateLimiter {
+import scala.concurrent.{ExecutionContext, Future}
+
+case class IPLimiter(ip: String, limit: Long, expiry: Long)(implicit rateLimiterStorage: RateLimiterStorage, executionContext: ExecutionContext) extends BaseRateLimiter {
   private final val Identifier = "IPLimiter"
 
-  override def allow: Boolean = {
+  override def allow: Future[Boolean] = {
     IPStrategy(Identifier, ip, limit, expiry).allow
   }
 
-  override def increment: Unit = {
+  override def increment: Future[Unit] = {
     IPStrategy(Identifier, ip, limit, expiry).increment()
   }
 

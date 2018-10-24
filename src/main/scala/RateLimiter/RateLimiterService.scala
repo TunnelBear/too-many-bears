@@ -2,6 +2,7 @@ package RateLimiter
 
 import RateLimiter.RateLimiters.{AuthLimiter, IPLimiter, TagLimiter}
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 
 trait RateLimiterService {
@@ -17,15 +18,15 @@ trait RateLimiterService {
   def ipExpiry: Duration
 
 
-  def authLimiter(ip: String, userIdentifier: String): AuthLimiter = {
+  def authLimiter(ip: String, userIdentifier: String)(implicit executionContext: ExecutionContext): AuthLimiter = {
     AuthLimiter(ip, userIdentifier, dictLimit, dictExpiry.toMillis, bruteLimit, bruteExpiry.toMillis)
   }
 
-  def ipLimiter(ip: String): IPLimiter = {
+  def ipLimiter(ip: String)(implicit executionContext: ExecutionContext) : IPLimiter = {
     IPLimiter(ip, ipLimit, ipExpiry.toMillis)
   }
 
-  def tagLimiter(tag: String, ip: String, limit: Long, expiry: Duration): TagLimiter = {
+  def tagLimiter(tag: String, ip: String, limit: Long, expiry: Duration)(implicit executionContext: ExecutionContext): TagLimiter = {
     TagLimiter(tag, ip, limit, expiry.toMillis)
   }
 }

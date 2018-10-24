@@ -3,7 +3,9 @@ package RateLimiter.RateLimiters
 import RateLimiter.RateLimiterStorage
 import RateLimiter.Strategies.{BruteForceStrategy, DictionaryStrategy}
 
-case class AuthLimiter(ip: String, userIdentifier: String, dictLimit: Long, dictExpiry: Long, bruteLimit: Long, bruteExpiry: Long)(implicit rateLimiterStorage: RateLimiterStorage) extends BaseRateLimiter {
+import scala.concurrent.{ExecutionContext, Future}
+
+case class AuthLimiter(ip: String, userIdentifier: String, dictLimit: Long, dictExpiry: Long, bruteLimit: Long, bruteExpiry: Long)(implicit rateLimiterStorage: RateLimiterStorage, executionContext: ExecutionContext) extends BaseRateLimiter {
 
   private final val DictIdentifier = "DictAuthLimiter"
   private final val BruteIdentifier = "BruteAuthLimiter"
@@ -13,12 +15,14 @@ case class AuthLimiter(ip: String, userIdentifier: String, dictLimit: Long, dict
     BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry)
   )
 
-  override def allow: Boolean = {
-    Strategies.forall(strategy => strategy.allow)
+  override def allow: Future[Boolean] = {
+    Future.traverse(Strategies)(strategy => strategy.allow)
+      .map(_.forall(identity))
   }
 
-  override def increment: Unit = {
-    Strategies.foreach(strategy => strategy.increment())
+  override def increment: Future[Unit] = {
+    Future.traverse(Strategies)(strategy => strategy.increment())
+      .map(_.tail)
   }
 }
 
