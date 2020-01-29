@@ -13,6 +13,8 @@ trait BaseStrategy {
   def limit: Long
   def expiry: Long
 
+  def blacklistOnBlock: Boolean = false
+
   def key: String = s"$identifier:$ip"
 
   def allow(implicit executionContext: ExecutionContext): Future[Boolean] = {
@@ -21,5 +23,9 @@ trait BaseStrategy {
 
   def increment(): Future[Unit] = {
     storage.incrementCount(key, System.currentTimeMillis.toString, expiry)
+  }
+
+  def blacklist(implicit executionContext: ExecutionContext): Future[Boolean] = {
+    allow.map(!_ && blacklistOnBlock)
   }
 }

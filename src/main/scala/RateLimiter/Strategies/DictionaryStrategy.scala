@@ -10,6 +10,8 @@ import scala.concurrent.Future
 case class DictionaryStrategy(identifier: String, ip: String, userIdentifier: String, limit: Long, expiry: Long)(implicit rateLimiterStorage: RateLimiterStorage) extends BaseStrategy {
   override implicit def storage: RateLimiterStorage = rateLimiterStorage
 
+  override def blacklistOnBlock: Boolean = true
+
   override def increment: Future[Unit] = {
     storage.incrementCount(key, userIdentifier, expiry)
   }
