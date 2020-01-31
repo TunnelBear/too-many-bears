@@ -10,7 +10,7 @@ case class AuthLimiter(ip: String, userIdentifier: String, dictLimit: Long, dict
   private final val DictIdentifier = "DictAuthLimiter"
   private final val BruteIdentifier = "BruteAuthLimiter"
 
-  private final val Strategies = List(
+  private final val Strategies = Seq(
     DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry),
     BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry)
   )
