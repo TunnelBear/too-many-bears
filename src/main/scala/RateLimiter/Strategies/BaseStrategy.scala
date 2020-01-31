@@ -11,8 +11,7 @@ trait BaseStrategy {
   def identifier: String
   def limit: Long
   def expiry: Long
-
-  def blacklistOnBlock: Boolean = false
+  def blacklistOnBlock: Boolean
 
   def key: String
 
