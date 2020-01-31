@@ -14,10 +14,13 @@ class ExampleController extends RateLimitedController {
     // Note that you wouldn't need to explicitly wrap your action with beforeAction if you were using one of Play's
     // action composition design patterns (e.g., Stackable Controller)
     beforeAction(ip) {
-      limiter.allowAndIncrement().map { allowed =>
+      limiter.allow.map { allowed =>
         if (!allowed) 429
         else {
+          limiter.increment()
+
           // do stuff
+
           200
         }
       }
@@ -28,10 +31,13 @@ class ExampleController extends RateLimitedController {
     val limiter: TagLimiter = tagLimiter("specific", ip, 10, 1 minute, blacklist = false)
 
     beforeAction(ip) {
-      limiter.allowAndIncrement().map { allowed =>
+      limiter.allow.map { allowed =>
         if (!allowed) 429
         else {
+          limiter.increment()
+
           // do stuff
+
           200
         }
       }

@@ -29,7 +29,7 @@ case class AuthLimiter(
       .map(_.forall(identity))
   }
 
-  override def increment: Future[Unit] = {
+  override def increment(): Future[Unit] = {
     Future.traverse(Strategies)(strategy => strategy.increment())
       .map(_.tail)
   }
