@@ -11,9 +11,8 @@ trait BaseStrategy {
   def identifier: String
   def limit: Long
   def expiry: Long
-  def blacklistOnBlock: Boolean
-
   def key: String
+  def blacklistOnBlock: Boolean
 
   def allow(implicit executionContext: ExecutionContext): Future[Boolean] = {
     storage.getCount(key, expiry).map(_ < limit)

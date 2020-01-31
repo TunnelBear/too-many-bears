@@ -5,22 +5,23 @@ import RateLimiter.Strategies.{BruteForceStrategy, DictionaryStrategy}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class AuthLimiter(ip: String,
+case class AuthLimiter(
+  ip: String,
   userIdentifier: String,
   dictLimit: Long,
   dictExpiry: Long,
-  blacklistOnBlockDict: Boolean,
+  dictBlacklist: Boolean,
   bruteLimit: Long,
   bruteExpiry: Long,
-  blacklistOnBlockBrute: Boolean,
+  bruteBlacklist: Boolean
 )(implicit rateLimiterStorage: RateLimiterStorage, executionContext: ExecutionContext) extends BaseRateLimiter {
 
   private final val DictIdentifier = "DictAuthLimiter"
   private final val BruteIdentifier = "BruteAuthLimiter"
 
   private final val Strategies = Seq(
-    DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry, blacklistOnBlockDict),
-    BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry, blacklistOnBlockBrute)
+    DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry, dictBlacklist),
+    BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry, bruteBlacklist)
   )
 
   override def allow: Future[Boolean] = {
