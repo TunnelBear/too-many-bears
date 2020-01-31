@@ -1,7 +1,7 @@
 package RateLimiter.RateLimiters
 
 import RateLimiter.RateLimiterStorage
-import RateLimiter.Strategies.IPStrategy
+import RateLimiter.Strategies.{BaseIPStrategy, IPStrategy}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -15,6 +15,8 @@ case class IPLimiter(ip: String, limit: Long, expiry: Long)(implicit rateLimiter
   override def increment: Future[Unit] = {
     IPStrategy(Identifier, ip, limit, expiry).increment()
   }
+
+  override def blacklist: Future[Boolean] = Future.successful(false)
 
 }
 

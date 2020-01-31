@@ -9,13 +9,12 @@ trait BaseStrategy {
   implicit def storage: RateLimiterStorage
 
   def identifier: String
-  def ip: String
   def limit: Long
   def expiry: Long
 
   def blacklistOnBlock: Boolean = false
 
-  def key: String = s"$identifier:$ip"
+  def key: String
 
   def allow(implicit executionContext: ExecutionContext): Future[Boolean] = {
     storage.getCount(key, expiry).map(_ < limit)

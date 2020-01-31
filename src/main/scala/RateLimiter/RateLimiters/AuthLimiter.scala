@@ -24,5 +24,10 @@ case class AuthLimiter(ip: String, userIdentifier: String, dictLimit: Long, dict
     Future.traverse(Strategies)(strategy => strategy.increment())
       .map(_.tail)
   }
+
+  override def blacklist: Future[Boolean] = {
+    Future.traverse(Strategies)(strategy => strategy.blacklist)
+      .map(_.exists(identity))
+  }
 }
 

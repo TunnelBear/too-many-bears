@@ -17,5 +17,7 @@ case class TagLimiter(tag: String, ip: String, limit: Long, expiry: Long)(implic
     TagStrategy(Identifier, tag, ip, limit, expiry).increment()
   }
 
+  override def blacklist: Future[Boolean] = Future.successful(false)
+
 }
 
