@@ -23,6 +23,7 @@ trait BaseStrategy {
   }
 
   def blacklist(implicit executionContext: ExecutionContext): Future[Boolean] = {
-    allow.map(!_ && blacklistOnBlock)
+    if (blacklistOnBlock) allow.map(!_)
+    else Future.successful(false)
   }
 }
