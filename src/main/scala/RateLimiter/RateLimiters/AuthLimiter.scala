@@ -14,29 +14,13 @@ case class AuthLimiter(
   bruteLimit: Long,
   bruteExpiry: Long,
   bruteBlacklist: Boolean
-)(implicit rateLimiterStorage: RateLimiterStorage, executionContext: ExecutionContext) extends BaseRateLimiter {
+)(implicit rateLimiterStorage: RateLimiterStorage, override val executionContext: ExecutionContext) extends StrategyRateLimiter {
 
   private final val DictIdentifier = "DictAuthLimiter"
   private final val BruteIdentifier = "BruteAuthLimiter"
 
-  private final val Strategies = Seq(
+  protected final def strategies = Seq(
     DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry, dictBlacklist),
     BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry, bruteBlacklist)
   )
-
-  override def allow: Future[Boolean] = {
-    Future.traverse(Strategies)(strategy => strategy.allow)
-      .map(_.forall(identity))
-  }
-
-  override def increment(): Future[Unit] = {
-    Future.traverse(Strategies)(strategy => strategy.increment())
-      .map(_.tail)
-  }
-
-  override def blacklist: Future[Boolean] = {
-    Future.traverse(Strategies)(strategy => strategy.blacklist)
-      .map(_.exists(identity))
-  }
 }
-
