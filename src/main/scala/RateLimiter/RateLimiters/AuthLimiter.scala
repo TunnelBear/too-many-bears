@@ -3,7 +3,7 @@ package RateLimiter.RateLimiters
 import RateLimiter.RateLimiterStorage
 import RateLimiter.Strategies.{BruteForceStrategy, DictionaryStrategy}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 case class AuthLimiter(
   ip: String,
@@ -19,7 +19,7 @@ case class AuthLimiter(
   private final val DictIdentifier = "DictAuthLimiter"
   private final val BruteIdentifier = "BruteAuthLimiter"
 
-  protected final def strategies = Seq(
+  protected final override def strategies = Seq(
     DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry, dictBlacklist),
     BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry, bruteBlacklist)
   )

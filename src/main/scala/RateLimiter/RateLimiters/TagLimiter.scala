@@ -13,7 +13,7 @@ case class TagLimiter(tag: String,
 )(implicit rateLimiterStorage: RateLimiterStorage, override val executionContext: ExecutionContext) extends StrategyRateLimiter {
   private final val Identifier = "TagLimiter"
 
-  protected final def strategies = Seq(
+  protected final override def strategies = Seq(
     TagStrategy(Identifier, tag, ip, limit, expiry, blacklistOnBlock)
   )
 }

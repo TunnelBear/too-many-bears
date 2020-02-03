@@ -13,7 +13,7 @@ case class GlobalTagLimiter(
 
   private final val Identifier = "GlobalTagLimiter"
 
-  protected final def strategies = Seq(
+  protected final override def strategies = Seq(
     GlobalTagStrategy(Identifier, tag, limit, expiry)
   )
 }
