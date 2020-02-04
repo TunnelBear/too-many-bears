@@ -5,7 +5,8 @@ import RateLimiter.Strategies.TagStrategy
 
 import scala.concurrent.ExecutionContext
 
-case class TagLimiter(tag: String,
+case class TagLimiter(
+  tag: String,
   ip: String,
   limit: Long,
   expiry: Long,
