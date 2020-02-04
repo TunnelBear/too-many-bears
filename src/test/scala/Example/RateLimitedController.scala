@@ -16,7 +16,7 @@ class RateLimitedController extends RateLimiterServiceImpl {
     limiter.allow.flatMap { allowed =>
       if (!allowed) Future.successful(429)
       else {
-        limiter.increment
+        limiter.increment()
         f
       }
     }

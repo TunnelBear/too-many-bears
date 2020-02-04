@@ -8,6 +8,16 @@ import scala.concurrent.Future
 
 class ExampleController extends RateLimitedController {
 
+  private val Action1 = "Action1"
+  private val Action2 = "Action2"
+
+  // Example of defining a rate limit depending on the action
+  override def tagLimit(tag: String): Long = tag match {
+    case `Action1` => 10
+    case `Action2` => 20
+    case _ => super.tagLimit(tag)
+  }
+
   def someAuthAction(ip: String, email: String): Future[Int] = {
     val limiter: AuthLimiter = authLimiter(ip, email)
 
@@ -28,7 +38,7 @@ class ExampleController extends RateLimitedController {
   }
 
   def someSpecificAction(ip: String): Future[Int] = {
-    val limiter: TagLimiter = tagLimiter("specific", ip, 10, 1 minute, blacklist = false)
+    val limiter: TagLimiter = tagLimiter(Action1, ip)
 
     beforeAction(ip) {
       limiter.allow.map { allowed =>
