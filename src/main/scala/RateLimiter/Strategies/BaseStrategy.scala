@@ -1,6 +1,7 @@
 package RateLimiter.Strategies
 
 import RateLimiter.RateLimiterStorage
+import RateLimiter.RateLimiterStatus._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -14,16 +15,16 @@ trait BaseStrategy {
   def key: String
   def blacklistOnBlock: Boolean
 
-  def allow(implicit executionContext: ExecutionContext): Future[Boolean] = {
-    storage.getCount(key, expiry).map(_ < limit)
+  def status(implicit executionContext: ExecutionContext): Future[RateLimiterStatus] = {
+    storage.getCount(key, expiry).map { count =>
+      println(s"CHECKING: $identifier, $count")
+      if (count < limit) Allow
+      else if (!blacklistOnBlock) Block
+      else Blacklist
+    }
   }
 
   def increment(): Future[Unit] = {
     storage.incrementCount(key, System.currentTimeMillis.toString, expiry)
-  }
-
-  def blacklist(implicit executionContext: ExecutionContext): Future[Boolean] = {
-    if (blacklistOnBlock) allow.map(!_)
-    else Future.successful(false)
   }
 }

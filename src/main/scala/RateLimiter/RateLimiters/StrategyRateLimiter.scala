@@ -1,6 +1,6 @@
 package RateLimiter.RateLimiters
 
-import RateLimiter.RateLimitingStatus.{Allowed, Blacklisted, RateLimited, RateLimitingStatus}
+import RateLimiter.RateLimiterStatus._
 import RateLimiter.Strategies.BaseStrategy
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -9,9 +9,14 @@ trait StrategyRateLimiter extends BaseRateLimiter {
   protected def strategies: Seq[BaseStrategy]
   implicit val executionContext: ExecutionContext
 
-  override def allow: Future[Boolean] = {
-    Future.traverse(strategies)(strategy => strategy.allow)
-      .map(_.forall(identity))
+  override def status: Future[RateLimiterStatus] = {
+    Future
+      .traverse(strategies)(strategy => strategy.status)
+      .map(_.fold(Allow) {
+        case (Allow, status) => status
+        case (Block, status) => if (status != Allow) status else Block
+        case (Blacklist, _) => Blacklist
+      })
   }
 
   override def increment(): Future[Unit] = {
@@ -19,22 +24,13 @@ trait StrategyRateLimiter extends BaseRateLimiter {
       .map(_.tail)
   }
 
-  override def blacklist: Future[Boolean] = {
-    Future.traverse(strategies)(strategy => strategy.blacklist)
-      .map(_.exists(identity))
-  }
-
-  override def checkAndIncrement(): Future[RateLimitingStatus] = {
-    allow.flatMap { allowed =>
-      if (allowed) {
+  // TODO: does this logic make sense, and is it intuitive? Should this logic live here?
+  override def statusWithIncrement(): Future[RateLimiterStatus] = {
+    status.map {
+      case Allow =>
         increment()
-        Future.successful(Allowed)
-      } else {
-        blacklist.map { blacklisted =>
-          if (blacklisted) Blacklisted
-          else RateLimited
-        }
-      }
+        Allow
+      case status => status
     }
   }
 }

@@ -2,6 +2,7 @@ package Example
 
 import RateLimiter.RateLimiterStorage
 import RateLimiter.RateLimiters.IPLimiter
+import RateLimiter.RateLimiterStatus._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -13,13 +14,10 @@ class RateLimitedController extends RateLimiterServiceImpl {
   def beforeAction(ip: String)(f: => Future[Int]): Future[Int] = {
     val limiter: IPLimiter = ipLimiter(ip)
 
-    limiter.allow.flatMap { allowed =>
-      if (!allowed) Future.successful(429)
-      else {
-        limiter.increment()
-        f
-      }
+    // TODO: note that if blacklisting is enabled, the case isn't handled.
+    limiter.statusWithIncrement().flatMap {
+      case Allow => f
+      case Block => Future.successful(429)
     }
   }
-
 }

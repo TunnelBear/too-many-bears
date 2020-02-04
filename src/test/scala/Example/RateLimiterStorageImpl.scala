@@ -13,7 +13,7 @@ object RateLimiterStorageImpl extends RateLimiterStorage {
     val entries = Storage.getOrElse(key, Map[String, Long]()) + (value -> System.currentTimeMillis)
     // Update storage
     Storage += (key -> entries)
-    Future.unit
+    Future.successful(())
   }
 
   def getCount(key: String, expiry: Long): Future[Long] = {

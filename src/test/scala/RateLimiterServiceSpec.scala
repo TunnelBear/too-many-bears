@@ -1,4 +1,5 @@
 import RateLimiter.{RateLimiterService, RateLimiterStorage}
+import RateLimiter.RateLimiterStatus._
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -15,12 +16,15 @@ class RateLimiterServiceSpec(implicit ee: ExecutionEnv) extends Specification wi
   val dictLimiterKey = s"DictAuthLimiter:$ip"
   val bruteLimiterKey = s"BruteAuthLimiter:$userIdentifier"
 
-  val tag1 = "tag1"
-  val tag2 = "tag2"
-  val tagLimiterKey1 = s"TagLimiter:$tag1:$ip"
-  val tagLimiterKey2 = s"TagLimiter:$tag2:$ip"
-  val globalTagLimiterKey1 = s"GlobalTagLimiter:$tag1"
-  val globalTagLimiterKey2 = s"GlobalTagLimiter:$tag2"
+  val tag = "tag1"
+  val tagWithBlacklist = "tag2"
+  val tagLimiterKey = s"TagLimiter:$tag:$ip"
+  val tagLimiterKeyBlacklist = s"TagLimiter:$tagWithBlacklist:$ip"
+
+  val globalTag1 = "tag"
+  val globalTag2 = "globalTag2"
+  val globalTagLimiterKey1 = s"GlobalTagLimiter:$globalTag1"
+  val globalTagLimiterKey2 = s"GlobalTagLimiter:$globalTag2"
 
   trait RateLimiterServiceImpl extends RateLimiterService {
 
@@ -36,186 +40,160 @@ class RateLimiterServiceSpec(implicit ee: ExecutionEnv) extends Specification wi
     override def ipExpiry: Duration = 3 minutes
     override def ipBlacklist: Boolean = false
 
-    override def tagLimit(tag: String): Long = tag match {
-      case `tag1` => 40
-      case `tag2` => 50
+    override def tagLimit(t: String): Long = t match {
+      case `tag` => 40
+      case `tagWithBlacklist` => 50
+      case _ => 60
     }
-    override def tagExpiry(tag: String): Duration = tag match {
-      case `tag1` => 4 minutes
-      case `tag2` => 5 minutes
+    override def tagExpiry(t: String): Duration = t match {
+      case `tag` => 4 minutes
+      case `tagWithBlacklist` => 5 minutes
+      case _ => 6 minutes
     }
-    override def tagBlacklist(tag: String): Boolean = tag match {
-      case `tag1` => true
-      case `tag2` => false
+    override def tagBlacklist(t: String): Boolean = t match {
+      case `tag` => false
+      case `tagWithBlacklist` => true
+      case _ => false
+    }
+
+  }
+
+  // TODO: test status and statusWithIncrement
+  "RateLimiterServiceTestImpl provides an IPLimiter" should {
+
+    "allows request that does not exceed given rate" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(1)
+
+      rls.ipLimiter(ip).status must be_==(Allow).await
+    }
+
+    "blocks request that exceeds given rate" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(rls.ipLimit)
+
+      rls.ipLimiter(ip).status must be_==(Block).await
+    }
+
+    "blacklist user if request is blocked and blacklisting is enabled" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl {
+        override implicit def storage: RateLimiterStorage = mockStorage
+        override def ipBlacklist = true
+      }
+      mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(rls.ipLimit)
+
+      rls.ipLimiter(ip).status must be_==(Blacklist).await
     }
 
   }
 
 
-    "RateLimiterServiceTestImpl provides an IPLimiter" should {
 
-      "allows request that does not exceed given rate" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(1)
+  "RateLimiterServiceTestImpl provides an AuthLimiter" should {
 
-        rls.ipLimiter(ip).allow must be_==(true).await // (allow => assert(allow))
-      }
+    "allows request that does not exceed given rates" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(1)
+      mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
 
-      "blocks request that exceeds given rate" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(rls.ipLimit)
-
-        rls.ipLimiter(ip).allow must be_==(true).await // (allow => assert(!allow))
-      }
-
-      "not blacklist user if request is blocked and blacklisting is disabled" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(rls.ipLimit)
-
-        rls.ipLimiter(ip).blacklist must be_==(true).await // (blacklist => assert(!blacklist))
-      }
-
-      "blacklist user if request is blocked and blacklisting is enabled" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl {
-          override implicit def storage: RateLimiterStorage = mockStorage
-          override def ipBlacklist = true
-        }
-        mockStorage.getCount(ipLimiterKey, rls.ipExpiry.toMillis) returns Future.successful(rls.ipLimit)
-
-        rls.ipLimiter(ip).blacklist must be_==(true).await // (blacklist => assert(blacklist))
-      }
-
+      rls.authLimiter(ip, userIdentifier).status must be_==(Allow).await
     }
 
+    "blocks request that exceeds dict rate" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(rls.dictLimit)
+      mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
 
-
-    "RateLimiterServiceTestImpl provides an AuthLimiter" should {
-
-      "allows request that does not exceed given rates" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(1)
-        mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
-
-        rls.authLimiter(ip, userIdentifier).allow must be_==(true).await // (allow => assert(allow))
-      }
-
-      "blocks request that exceeds dict rate" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(rls.dictLimit)
-        mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
-
-        rls.authLimiter(ip, userIdentifier).allow must be_==(true).await // (allow => assert(!allow))
-      }
-
-      "blocks request that exceeds brute rate" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(1)
-        mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(rls.bruteLimit)
-
-        rls.authLimiter(ip, userIdentifier).allow must be_==(true).await // (allow => assert(!allow))
-      }
-
-      "not blacklist a user if request is blocked and blacklisting is disabled" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(rls.dictLimit)
-        mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
-
-        rls.authLimiter(ip, userIdentifier).blacklist must be_==(true).await // (blacklist => assert(!blacklist))
-      }
-
-      "blacklist a user if request is blocked and blacklisting is enabled" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl {
-          override implicit def storage: RateLimiterStorage = mockStorage
-          override def dictBlacklist = true
-        }
-        mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(rls.dictLimit)
-        mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
-
-        rls.authLimiter(ip, userIdentifier).blacklist must be_==(true).await // (blacklist => assert(blacklist))
-      }
-
+      rls.authLimiter(ip, userIdentifier).status must be_==(Block).await
     }
 
+    "blocks request that exceeds brute rate" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(1)
+      mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(rls.bruteLimit)
 
-
-    "RateLimiterServiceTestImpl provides a TagLimiter" should {
-
-      "allows request that does not exceed given rates" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-
-        mockStorage.getCount(tagLimiterKey1, rls.tagExpiry(tag1).toMillis) returns Future.successful(1)
-        mockStorage.getCount(tagLimiterKey2, rls.tagExpiry(tag2).toMillis) returns Future.successful(1)
-
-        rls.tagLimiter(tag1, ip).allow must be_==(true).await // (allow => assert(allow))
-        rls.tagLimiter(tag2, ip).allow must be_==(true).await // (allow => assert(allow))
-      }
-
-      "blocks request that exceeds given rate" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(tagLimiterKey1, rls.tagExpiry(tag1).toMillis) returns Future.successful(rls.tagLimit(tag1))
-        mockStorage.getCount(tagLimiterKey2, rls.tagExpiry(tag2).toMillis) returns Future.successful(1)
-
-        rls.tagLimiter(tag1, ip).allow must be_==(true).await // (allow => assert(!allow))
-        rls.tagLimiter(tag2, ip).allow must be_==(true).await // (allow => assert(allow))
-      }
-
-      "not blacklist a user if request is blocked and blacklisting is disabled" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(tagLimiterKey1, rls.tagExpiry(tag1).toMillis) returns Future.successful(rls.tagLimit(tag1))
-        mockStorage.getCount(tagLimiterKey2, rls.tagExpiry(tag2).toMillis) returns Future.successful(1)
-
-        rls.tagLimiter(tag1, ip).blacklist must be_==(true).await // (blacklist => assert(!blacklist))
-        rls.tagLimiter(tag2, ip).blacklist must be_==(true).await // (blacklist => assert(!blacklist))
-      }
-
-      "blacklist a user if request is blocked and blacklisting is enabled" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(tagLimiterKey1, rls.tagExpiry(tag1).toMillis) returns Future.successful(rls.tagLimit(tag1))
-        mockStorage.getCount(tagLimiterKey2, rls.tagExpiry(tag2).toMillis) returns Future.successful(1)
-
-        rls.tagLimiter(tag1, ip).blacklist must be_==(true).await // (blacklist => assert(blacklist))
-        rls.tagLimiter(tag2, ip).blacklist must be_==(true).await // (blacklist => assert(!blacklist))
-      }
-
+      rls.authLimiter(ip, userIdentifier).status must be_==(Block).await
     }
 
-
-
-    "RateLimiterServiceTestImpl provides a GlobalTagLimiter" should {
-
-      "allows request that does not exceed given rates" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(globalTagLimiterKey1, rls.tagExpiry(tag1).toMillis) returns Future.successful(1)
-        mockStorage.getCount(globalTagLimiterKey2, rls.tagExpiry(tag2).toMillis) returns Future.successful(1)
-
-        rls.globalTagLimiter(tag1).allow must be_==(true).await // (allow => assert(allow))
-        rls.globalTagLimiter(tag2).allow must be_==(true).await // (allow => assert(allow))
+    "blacklist a user if request is blocked and blacklisting is enabled" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl {
+        override implicit def storage: RateLimiterStorage = mockStorage
+        override def dictBlacklist = true
       }
+      mockStorage.getCount(dictLimiterKey, rls.dictExpiry.toMillis) returns Future.successful(rls.dictLimit)
+      mockStorage.getCount(bruteLimiterKey, rls.bruteExpiry.toMillis) returns Future.successful(1)
 
-      "blocks request that exceeds given rate" in {
-        val mockStorage = mock[RateLimiterStorage]
-        val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
-        mockStorage.getCount(globalTagLimiterKey1, rls.tagExpiry(tag1).toMillis) returns Future.successful(rls.tagLimit(tag1))
-        mockStorage.getCount(globalTagLimiterKey2, rls.tagExpiry(tag2).toMillis) returns Future.successful(1)
+      rls.authLimiter(ip, userIdentifier).status must be_==(Blacklist).await
+    }
 
-        rls.globalTagLimiter(tag1).allow must be_==(true).await // (allow => assert(!allow))
-        rls.globalTagLimiter(tag2).allow must be_==(true).await // (allow => assert(allow))
-      }
+  }
 
+
+
+  "RateLimiterServiceTestImpl provides a TagLimiter" should {
+
+    "allows request that does not exceed given rates" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+
+      mockStorage.getCount(tagLimiterKey, rls.tagExpiry(tag).toMillis) returns Future.successful(1)
+      mockStorage.getCount(tagLimiterKeyBlacklist, rls.tagExpiry(tagWithBlacklist).toMillis) returns Future.successful(1)
+
+      rls.tagLimiter(tag, ip).status must be_==(Allow).await
+      rls.tagLimiter(tagWithBlacklist, ip).status must be_==(Allow).await
+    }
+
+    "blocks request that exceeds given rate" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(tagLimiterKey, rls.tagExpiry(tag).toMillis) returns Future.successful(rls.tagLimit(tag))
+      mockStorage.getCount(tagLimiterKeyBlacklist, rls.tagExpiry(tagWithBlacklist).toMillis) returns Future.successful(1)
+
+      rls.tagLimiter(tag, ip).status must be_==(Block).await
+      rls.tagLimiter(tagWithBlacklist, ip).status must be_==(Allow).await
+    }
+
+    "blacklist a user if request is blocked and blacklisting is enabled" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(tagLimiterKey, rls.tagExpiry(tag).toMillis) returns Future.successful(1)
+      mockStorage.getCount(tagLimiterKeyBlacklist, rls.tagExpiry(tagWithBlacklist).toMillis) returns Future.successful(rls.tagLimit(tagWithBlacklist))
+
+      rls.tagLimiter(tag, ip).status must be_==(Allow).await
+      rls.tagLimiter(tagWithBlacklist, ip).status must be_==(Blacklist).await
+    }
+
+  }
+
+
+
+  "RateLimiterServiceTestImpl provides a GlobalTagLimiter" should {
+
+    "allows request that does not exceed given rates" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(globalTagLimiterKey1, rls.tagExpiry(globalTag1).toMillis) returns Future.successful(1)
+      mockStorage.getCount(globalTagLimiterKey2, rls.tagExpiry(globalTag2).toMillis) returns Future.successful(1)
+
+      rls.globalTagLimiter(globalTag1).status must be_==(Allow).await
+      rls.globalTagLimiter(globalTag2).status must be_==(Allow).await
+    }
+
+    "blocks request that exceeds given rate" in {
+      val mockStorage = mock[RateLimiterStorage]
+      val rls = new RateLimiterServiceImpl { override implicit def storage: RateLimiterStorage = mockStorage }
+      mockStorage.getCount(globalTagLimiterKey1, rls.tagExpiry(globalTag1).toMillis) returns Future.successful(rls.tagLimit(globalTag1))
+      mockStorage.getCount(globalTagLimiterKey2, rls.tagExpiry(globalTag2).toMillis) returns Future.successful(1)
+
+      rls.globalTagLimiter(globalTag1).status must be_==(Block).await
+      rls.globalTagLimiter(globalTag2).status must be_==(Allow).await
     }
 
   }
