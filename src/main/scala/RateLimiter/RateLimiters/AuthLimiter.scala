@@ -3,26 +3,24 @@ package RateLimiter.RateLimiters
 import RateLimiter.RateLimiterStorage
 import RateLimiter.Strategies.{BruteForceStrategy, DictionaryStrategy}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-case class AuthLimiter(ip: String, userIdentifier: String, dictLimit: Long, dictExpiry: Long, bruteLimit: Long, bruteExpiry: Long)(implicit rateLimiterStorage: RateLimiterStorage, executionContext: ExecutionContext) extends BaseRateLimiter {
+case class AuthLimiter(
+  ip: String,
+  userIdentifier: String,
+  dictLimit: Long,
+  dictExpiry: Long,
+  dictBlacklist: Boolean,
+  bruteLimit: Long,
+  bruteExpiry: Long,
+  bruteBlacklist: Boolean
+)(implicit rateLimiterStorage: RateLimiterStorage, override val executionContext: ExecutionContext) extends StrategyRateLimiter {
 
   private final val DictIdentifier = "DictAuthLimiter"
   private final val BruteIdentifier = "BruteAuthLimiter"
 
-  private final val Strategies = List(
-    DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry),
-    BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry)
+  protected final override def strategies = Seq(
+    DictionaryStrategy(DictIdentifier, ip, userIdentifier, dictLimit, dictExpiry, dictBlacklist),
+    BruteForceStrategy(BruteIdentifier, ip, userIdentifier, bruteLimit, bruteExpiry, bruteBlacklist)
   )
-
-  override def allow: Future[Boolean] = {
-    Future.traverse(Strategies)(strategy => strategy.allow)
-      .map(_.forall(identity))
-  }
-
-  override def increment: Future[Unit] = {
-    Future.traverse(Strategies)(strategy => strategy.increment())
-      .map(_.tail)
-  }
 }
-

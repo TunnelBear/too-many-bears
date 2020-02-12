@@ -1,8 +1,11 @@
 package RateLimiter.RateLimiters
 
+import RateLimiter.RateLimiterStatus.RateLimiterStatus
+
 import scala.concurrent.Future
 
 trait BaseRateLimiter {
-  def allow: Future[Boolean]
-  def increment: Future[Unit]
+  def status: Future[RateLimiterStatus]
+  def increment(): Future[Unit]
+  def statusWithIncrement(): Future[RateLimiterStatus]
 }

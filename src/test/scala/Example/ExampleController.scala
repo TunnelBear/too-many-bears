@@ -1,26 +1,48 @@
 package Example
 
-import RateLimiter.RateLimiters.TagLimiter
+import RateLimiter.RateLimiters.{AuthLimiter, TagLimiter}
+import RateLimiter.RateLimiterStatus._
 
-import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 class ExampleController extends RateLimitedController {
 
-  def someAuthAction(ip: String, email: String): Int = {
-    if (!authLimiter(ip, email).allow) return 429
-    else authLimiter(ip, email).increment
+  private val Action1 = "Action1"
+  private val Action2 = "Action2"
 
-    // do actions
-    200
+  // Example of defining a rate limit depending on the action
+  override def tagLimit(tag: String): Long = tag match {
+    case `Action1` => 10
+    case `Action2` => 20
+    case _ => super.tagLimit(tag)
   }
 
-  def someSpecificAction(ip: String): Int = {
-    val limiter: TagLimiter = tagLimiter("specific", ip, 10, 1 minute)
+  def someAuthAction(ip: String, email: String): Future[Int] = {
+    val limiter: AuthLimiter = authLimiter(ip, email)
 
-    if (!limiter.allow) return 429
-    else limiter.increment
+    // Note that you wouldn't need to explicitly wrap your action with beforeAction if you were using one of Play's
+    // action composition design patterns (e.g., Stackable Controller)
+    beforeAction(ip) {
+      limiter.statusWithIncrement().map {
+        case Allow =>
+          // do stuff
+          200
+        case _ => 429
+      }
+    }
+  }
 
-    // do stuff
-    200
+  def someSpecificAction(ip: String): Future[Int] = {
+    val limiter: TagLimiter = tagLimiter(Action1, ip)
+
+    beforeAction(ip) {
+      limiter.statusWithIncrement().map {
+        case Allow =>
+          // do stuff
+          200
+        case _ => 429
+      }
+    }
   }
 }

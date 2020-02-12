@@ -1,20 +1,19 @@
 package RateLimiter.RateLimiters
 
 import RateLimiter.RateLimiterStorage
-import RateLimiter.Strategies.TagStrategy
+import RateLimiter.Strategies.GlobalTagStrategy
 
 import scala.concurrent.ExecutionContext
 
-case class TagLimiter(
+case class GlobalTagLimiter(
   tag: String,
-  ip: String,
   limit: Long,
-  expiry: Long,
-  blacklistOnBlock: Boolean
+  expiry: Long
 )(implicit rateLimiterStorage: RateLimiterStorage, override val executionContext: ExecutionContext) extends StrategyRateLimiter {
-  private final val Identifier = "TagLimiter"
+
+  private final val Identifier = "GlobalTagLimiter"
 
   protected final override def strategies = Seq(
-    TagStrategy(Identifier, tag, ip, limit, expiry, blacklistOnBlock)
+    GlobalTagStrategy(Identifier, tag, limit, expiry)
   )
 }
